@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SheetToPDF — Excel to PDF Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --border: #E2DDD5;
+    --text: #1A1714;
+    --muted: #7A746C;
+    --accent: #2D5A3D;
+    --accent-light: #EBF2EE;
+    --accent-mid: #4A8A63;
+    --danger: #B83232;
+    --danger-light: #FBEAEA;
+    --warn: #8B6914;
+    --warn-light: #FBF4E5;
+    --radius: 12px;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Fraunces', Georgia, serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141210;
+      --surface: #1E1C19;
+      --border: #2E2B27;
+      --text: #F0EDE8;
+      --muted: #8A847C;
+      --accent: #5AAA78;
+      --accent-light: #1A2B20;
+      --accent-mid: #4A8A63;
+    }
+  }
+
+  body {
+    font-family: var(--mono);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .logo-icon svg { width: 18px; height: 18px; fill: none; stroke: white; stroke-width: 1.5; }
+
+  .logo-name {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  .logo-name span { color: var(--accent); }
+
+  .badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  main {
+    flex: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 3rem 1.5rem;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .hero h1 {
+    font-family: var(--serif);
+    font-size: 38px;
+    font-weight: 300;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin-bottom: 0.75rem;
+  }
+
+  .hero h1 em { font-style: italic; color: var(--accent); }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .drop-zone {
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-icon {
+    width: 48px; height: 48px;
+    background: var(--accent-light);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1rem;
+    color: var(--accent);
+    font-size: 22px;
+  }
+
+  .drop-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+
+  .drop-sub {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .file-info {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+  }
+
+  .file-info.show { display: flex; }
+
+  .file-ext {
+    width: 40px; height: 40px;
+    background: var(--accent-light);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .file-meta { flex: 1; min-width: 0; }
+  .file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .remove-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); padding: 4px; border-radius: 6px;
+    display: flex; align-items: center;
+    transition: color 0.1s, background 0.1s;
+  }
+  .remove-btn:hover { color: var(--danger); background: var(--danger-light); }
+
+  .options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+  }
+
+  .option-group label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .option-group select, .option-group input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23999' stroke-width='1.5' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
+  }
+
+  .option-group select:focus, .option-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .sheets-section {
+    display: none;
+    margin-bottom: 1.5rem;
+  }
+
+  .sheets-section.show { display: block; }
+
+  .sheets-section label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .sheet-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sheet-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.1s;
+    background: var(--bg);
+    color: var(--muted);
+    user-select: none;
+  }
+
+  .sheet-chip.active {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+
+  .sheet-chip .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  .convert-btn {
+    width: 100%;
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: 0.3px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+
+  .convert-btn:hover { opacity: 0.9; }
+  .convert-btn:active { transform: scale(0.99); }
+  .convert-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .convert-btn svg { width: 16px; height: 16px; fill: none; stroke: white; stroke-width: 2; }
+
+  .progress-bar {
+    display: none;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+
+  .progress-bar.show { display: block; }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 2px;
+  }
+
+  .status-msg {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 1rem;
+    min-height: 18px;
+  }
+
+  .download-section {
+    display: none;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    background: var(--accent-light);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    text-align: center;
+  }
+
+  .download-section.show { display: block; }
+
+  .download-section p {
+    font-size: 13px;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+
+  .download-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 24px;
+    background: var(--accent);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    transition: opacity 0.15s;
+    cursor: pointer;
+    border: none;
+  }
+
+  .download-btn:hover { opacity: 0.9; }
+  .download-btn svg { width: 15px; height: 15px; fill: none; stroke: white; stroke-width: 2; }
+
+  .error-msg {
+    display: none;
+    padding: 12px 16px;
+    background: var(--danger-light);
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--danger);
+    margin-bottom: 1.5rem;
+  }
+
+  .error-msg.show { display: block; }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 3rem;
+  }
+
+  .feature {
+    text-align: center;
+    padding: 1.25rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .feature-icon {
+    font-size: 20px;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+
+  .feature h3 {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .feature p {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  footer {
+    text-align: center;
+    padding: 1.5rem;
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 500px) {
+    .options { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18"><rect x="2" y="2" width="14" height="14" rx="2"/><path d="M6 6h6M6 9h6M6 12h4"/></svg>
+    </div>
+    <span class="logo-name">Sheet<span>PDF</span></span>
+  </div>
+  <span class="badge">FREE · PRIVATE</span>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Excel to PDF,<br><em>instantly</em></h1>
+    <p>Convert .xlsx and .xls files to PDF in your browser.<br>No upload to servers. Your data stays on your device.</p>
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+    <div class="drop-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6M12 9v6M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5"/></svg>
+    </div>
+    <div class="drop-title">Drop your Excel file here</div>
+    <div class="drop-sub">or click to browse · .xlsx .xls .csv supported</div>
+  </div>
+
+  <div class="file-info" id="fileInfo">
+    <div class="file-ext" id="fileExt">XLS</div>
+    <div class="file-meta">
+      <div class="file-name" id="fileName">—</div>
+      <div class="file-size" id="fileSize">—</div>
+    </div>
+    <button class="remove-btn" id="removeBtn" title="Remove file">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <div class="sheets-section" id="sheetsSection">
+    <label>Select sheets to include</label>
+    <div class="sheet-chips" id="sheetChips"></div>
+  </div>
+
+  <div class="options">
+    <div class="option-group">
+      <label>Page size</label>
+      <select id="pageSize">
+        <option value="a4">A4</option>
+        <option value="letter">Letter (US)</option>
+        <option value="a3">A3</option>
+        <option value="legal">Legal</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label>Orientation</label>
+      <select id="orientation">
+        <option value="landscape">Landscape</option>
+        <option value="portrait">Portrait</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label>Font size</label>
+      <select id="fontSize">
+        <option value="7">7pt — compact</option>
+        <option value="9" selected>9pt — normal</option>
+        <option value="11">11pt — large</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label>Filename</label>
+      <input type="text" id="outputName" placeholder="output.pdf" />
+    </div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="status-msg" id="statusMsg"></div>
+
+  <button class="convert-btn" id="convertBtn" disabled>
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>
+    Convert to PDF
+  </button>
+
+  <div class="download-section" id="downloadSection">
+    <p>✓ PDF ready — click below to download</p>
+    <button class="download-btn" id="downloadBtn">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Download PDF
+    </button>
+  </div>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🔒</div>
+      <h3>100% private</h3>
+      <p>All processing happens in your browser. Files never leave your device.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⚡</div>
+      <h3>Instant convert</h3>
+      <p>No waiting. No queue. Converts in milliseconds.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📋</div>
+      <h3>Multi-sheet</h3>
+      <p>Pick which sheets to include. Each sheet becomes its own page group.</p>
+    </div>
+  </div>
+</main>
+
+<footer>SheetPDF · Runs entirely in your browser · No data stored</footer>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const fileExt = document.getElementById('fileExt');
+const fileName = document.getElementById('fileName');
+const fileSize = document.getElementById('fileSize');
+const removeBtn = document.getElementById('removeBtn');
+const sheetsSection = document.getElementById('sheetsSection');
+const sheetChips = document.getElementById('sheetChips');
+const convertBtn = document.getElementById('convertBtn');
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+const statusMsg = document.getElementById('statusMsg');
+const downloadSection = document.getElementById('downloadSection');
+const downloadBtn = document.getElementById('downloadBtn');
+const errorMsg = document.getElementById('errorMsg');
+const outputNameInput = document.getElementById('outputName');
+
+let currentFile = null;
+let workbook = null;
+let selectedSheets = new Set();
+let pdfBlob = null;
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function showError(msg) {
+  errorMsg.textContent = msg;
+  errorMsg.classList.add('show');
+  setTimeout(() => errorMsg.classList.remove('show'), 5000);
+}
+
+function setProgress(pct, msg) {
+  progressFill.style.width = pct + '%';
+  statusMsg.textContent = msg || '';
+}
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
+fileInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+removeBtn.addEventListener('click', resetState);
+
+function resetState() {
+  currentFile = null; workbook = null; selectedSheets.clear(); pdfBlob = null;
+  fileInfo.classList.remove('show');
+  sheetsSection.classList.remove('show');
+  sheetChips.innerHTML = '';
+  convertBtn.disabled = true;
+  downloadSection.classList.remove('show');
+  progressBar.classList.remove('show');
+  statusMsg.textContent = '';
+  outputNameInput.value = '';
+  fileInput.value = '';
+}
+
+function handleFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx','xls','csv'].includes(ext)) {
+    showError('Please upload an .xlsx, .xls, or .csv file.');
+    return;
+  }
+  currentFile = file;
+  fileExt.textContent = ext.toUpperCase();
+  fileName.textContent = file.name;
+  fileSize.textContent = formatSize(file.size);
+  outputNameInput.placeholder = file.name.replace(/\.[^.]+$/, '') + '.pdf';
+  fileInfo.classList.add('show');
+  downloadSection.classList.remove('show');
+  statusMsg.textContent = 'Reading file…';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      workbook = XLSX.read(e.target.result, { type: 'array' });
+      buildSheetChips();
+      convertBtn.disabled = false;
+      statusMsg.textContent = `${workbook.SheetNames.length} sheet${workbook.SheetNames.length !== 1 ? 's' : ''} found`;
+    } catch(err) {
+      showError('Could not read file. Is it a valid Excel or CSV?');
+      statusMsg.textContent = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function buildSheetChips() {
+  sheetChips.innerHTML = '';
+  selectedSheets = new Set(workbook.SheetNames);
+  workbook.SheetNames.forEach(name => {
+    const chip = document.createElement('div');
+    chip.className = 'sheet-chip active';
+    chip.innerHTML = `<span class="dot"></span>${name}`;
+    chip.dataset.sheet = name;
+    chip.addEventListener('click', () => {
+      if (selectedSheets.has(name)) {
+        if (selectedSheets.size === 1) return;
+        selectedSheets.delete(name);
+        chip.classList.remove('active');
+      } else {
+        selectedSheets.add(name);
+        chip.classList.add('active');
+      }
+    });
+    sheetChips.appendChild(chip);
+  });
+  sheetsSection.classList.toggle('show', workbook.SheetNames.length > 1);
+}
+
+convertBtn.addEventListener('click', async () => {
+  if (!workbook) return;
+  convertBtn.disabled = true;
+  downloadSection.classList.remove('show');
+  progressBar.classList.add('show');
+  setProgress(5, 'Initialising PDF engine…');
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pageSize = document.getElementById('pageSize').value;
+    const orientation = document.getElementById('orientation').value;
+    const fontSize = parseInt(document.getElementById('fontSize').value);
+
+    const doc = new jsPDF({ orientation, unit: 'pt', format: pageSize });
+    const sheets = workbook.SheetNames.filter(n => selectedSheets.has(n));
+    let isFirst = true;
+
+    for (let i = 0; i < sheets.length; i++) {
+      const sheetName = sheets[i];
+      setProgress(10 + Math.round((i / sheets.length) * 75), `Converting "${sheetName}"…`);
+      await new Promise(r => setTimeout(r, 10));
+
+      const ws = workbook.Sheets[sheetName];
+
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      const numRows = range.e.r - range.s.r + 1;
+      const numCols = range.e.c - range.s.c + 1;
+
+      const data = [];
+      for (let R = range.s.r; R <= range.e.r; R++) {
+        const row = [];
+        for (let C = range.s.c; C <= range.e.c; C++) {
+          const cellAddr = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = ws[cellAddr];
+          row.push(cell ? String(cell.v ?? '') : '');
+        }
+        data.push(row);
+      }
+
+      if (!data || data.length === 0) continue;
+
+      const maxCols = numCols;
+      const head = [data[0]];
+      const body = data.slice(1).map(row => {
+        const r = [...row];
+        while (r.length < maxCols) r.push('');
+        return r;
+      });
+
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const mL = 15, mR = 15, mT = 52;
+      const usable = pageW - mL - mR;
+
+      // Measure max content length per column (sample up to 40 rows)
+      const sampleRows = [data[0], ...data.slice(1, 41)];
+      const maxLens = new Array(maxCols).fill(0);
+      sampleRows.forEach(row => {
+        for (let ci = 0; ci < maxCols; ci++) {
+          const len = String(row[ci] ?? '').length;
+          if (len > maxLens[ci]) maxLens[ci] = len;
+        }
+      });
+
+      // Determine font size: try from user-chosen down to 7pt
+      const MIN_FONT = 7;
+      const CHAR_RATIO = 0.55; // pt per font-size unit per char
+      const MIN_COL = 22;      // minimum column width in pt
+
+      function computeColWidths(fs) {
+        return maxLens.map(l => Math.max(l * fs * CHAR_RATIO + 8, MIN_COL));
+      }
+
+      let efs = fontSize;
+      let colWidths = computeColWidths(efs);
+      let totalW = colWidths.reduce((a, b) => a + b, 0);
+
+      // Try shrinking font to fit all columns on one page
+      while (totalW > usable && efs > MIN_FONT) {
+        efs--;
+        colWidths = computeColWidths(efs);
+        totalW = colWidths.reduce((a, b) => a + b, 0);
+      }
+
+      const cp = efs <= 7 ? 2 : 3;
+
+      // If still too wide after min font, split into column groups across pages
+      const colGroups = [];
+      let groupStart = 0;
+      while (groupStart < maxCols) {
+        let groupW = 0;
+        let groupEnd = groupStart;
+        while (groupEnd < maxCols && groupW + colWidths[groupEnd] <= usable) {
+          groupW += colWidths[groupEnd];
+          groupEnd++;
+        }
+        // Avoid infinite loop if a single column is wider than page
+        if (groupEnd === groupStart) groupEnd = groupStart + 1;
+        colGroups.push({ start: groupStart, end: groupEnd });
+        groupStart = groupEnd;
+      }
+
+      const totalGroups = colGroups.length;
+
+      colGroups.forEach((grp, gi) => {
+        const sliceCols = (row) => row.slice(grp.start, grp.end);
+        const grpHead = [sliceCols(data[0])];
+        const grpBody = data.slice(1).map(row => {
+          const r = [...row];
+          while (r.length < maxCols) r.push('');
+          return sliceCols(r);
+        });
+
+        const grpColCount = grp.end - grp.start;
+        const grpWidths = colWidths.slice(grp.start, grp.end);
+        const grpTotalW = grpWidths.reduce((a, b) => a + b, 0);
+        // Scale group to fill usable width nicely
+        const grpScale = grpTotalW < usable * 0.6 ? 1 : usable / grpTotalW;
+
+        const grpColStyles = {};
+        grpWidths.forEach((w, ci) => { grpColStyles[ci] = { cellWidth: w * grpScale }; });
+
+        if (!isFirst) doc.addPage();
+        isFirst = false;
+
+        doc.setFontSize(efs + 2);
+        doc.setFont(undefined, 'bold');
+        const label = totalGroups > 1
+          ? sheetName + '  (cols ' + (grp.start + 1) + '-' + grp.end + ' of ' + maxCols + ')'
+          : sheetName;
+        doc.text(label, mL, 36);
+
+        doc.autoTable({
+          head: grpHead,
+          body: grpBody,
+          startY: mT,
+          tableWidth: grpWidths.reduce((a,b)=>a+b,0) * grpScale,
+          columnStyles: grpColStyles,
+          styles: { fontSize: efs, cellPadding: cp, lineColor: [220, 215, 210], lineWidth: 0.5, font: 'helvetica', overflow: 'linebreak' },
+          headStyles: { fillColor: [45, 90, 61], textColor: 255, fontStyle: 'bold', fontSize: efs },
+          alternateRowStyles: { fillColor: [247, 245, 240] },
+          tableLineColor: [200, 196, 190],
+          tableLineWidth: 0.5,
+          margin: { top: mT, left: mL, right: mR },
+          didParseCell: (d) => {
+            if (d.section === 'body') {
+              const v = d.cell.raw;
+              if (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) {
+                d.cell.styles.halign = 'right';
+              }
+            }
+          }
+        });
+      });
+    }
+
+    setProgress(92, 'Finalising…');
+    await new Promise(r => setTimeout(r, 80));
+
+    const outName = outputNameInput.value.trim() || (currentFile.name.replace(/\.[^.]+$/, '') + '.pdf');
+    pdfBlob = doc.output('blob');
+
+    setProgress(100, `Done — ${formatSize(pdfBlob.size)}`);
+    downloadSection.classList.add('show');
+
+    downloadBtn.onclick = () => {
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url; a.download = outName.endsWith('.pdf') ? outName : outName + '.pdf';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    };
+
+  } catch(err) {
+    showError('Conversion failed: ' + (err.message || 'Unknown error'));
+    setProgress(0, '');
+    progressBar.classList.remove('show');
+  } finally {
+    convertBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
